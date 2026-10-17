@@ -1,27 +1,15 @@
-# SimpleCater frontend
+# SimpleCater: separate customer and owner interfaces
 
-Approved interactive frontend prototype for the IBM Z Datathon.
+Frontend-only preview: `python3 -m http.server 4319` from this folder. Open `/index.html`. Sample accounts: `customer` / `demo`, `owner` / `demo`. Browser demo session is simulated and editable; never use real credentials or profile data. No admin remains.
 
-## Run locally
+- index.html: sign-in; no workspace/role switch.
+- customer.html: menu, recommendation with explanation, cart, own orders/profile.
+- owner.html: business orders and sales assistant only.
+- app.js / styles.css: UI behavior and approved design.
+- services.js: explicit demo and real API adapters.
+- config.js: static preview defaults to demo. FastAPI serves an API-mode config automatically.
+- fixtures.js: synthetic customer/order/menu records, no admin data.
 
-From this directory:
+Signed-in account determines its workspace. Opening the other page shows access denied in the demo. Real security is enforced by backend/app.py with backend/auth.py: protected HTML and API routes require a valid session and correct role. Business/member ownership checks must be implemented in data queries as specified in ../docs/API_CONTRACT.md.
 
-```sh
-python3 -m http.server 8000
-```
-
-Open http://localhost:8000. There is no dependency installation or build step.
-
-## Included views
-
-- **Customer:** menu filters, contextual pairing previews, a separate cart tab, a floating cart button, pickup ordering, and order history.
-- **Business owner:** sample orders, order totals, menu-item count, and an AI sales-summary preview.
-- **Admin:** business accounts with confirmation before enabling or pausing them.
-
-The role switch is a design-preview control, not authentication. Orders and account changes exist only in page memory and reset on reload. Pairings and generated summaries are illustrative; no AI model is called.
-
-## Backend integration
-
-Replace the sample arrays and interaction handlers in `index.html` with calls to the team's backend for authentication, authorized menu/order access, and predictive/generative AI. Enforce authorization on the server. Customer profile encryption and password hashing belong in the backend and are not implemented in this frontend.
-
-The page loads fonts from Google Fonts and photographs from Unsplash, so those assets require internet access. No payments, database, credentials, or LinuxONE deployment configuration are included.
+The server shell deliberately returns 501 for unfinished login/business/AI endpoints. No fake model or crypto runs in connected mode. Member assignments and resource credits live under ../docs/. Profile save is plain in-memory data in demo; planned backend encryption is explicitly separate.
