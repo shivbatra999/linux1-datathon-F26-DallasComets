@@ -1,5 +1,12 @@
 # compose.yaml
 services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - app_data:/data
+
   granite:
     platform: linux/s390x
     build: ./docker/granite
@@ -24,4 +31,5 @@ services:
           --host 0.0.0.0 --port 8080 --ctx-size 4096 --parallel 1
 
 volumes:
+  app_data:
   granite_models:
