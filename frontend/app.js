@@ -10,7 +10,7 @@ function topItem(){let stats={};orders.forEach(o=>o.items.split(', ').forEach(s=
 function render(){$('#avatar').textContent=role==='customer'?'AS':role==='owner'?'MC':'AD';$('#app').innerHTML=role==='customer'?customer():owner();bind()}
 function ask(title,text,action){$('#dialog-title').textContent=title;$('#dialog-text').textContent=text;$('#confirm').showModal();$('#approve').onclick=()=>{$('#confirm').close();action()};$('#cancel').onclick=()=>$('#confirm').close()}
 async function run(action){if(busy)return;busy=true;document.querySelectorAll('#app button').forEach(b=>b.disabled=true);try{await action()}catch(e){toast(e.message||'Request failed. Please try again.')}finally{busy=false;render()}}
-async function selectItem(id){lastSelected=Number(id);recommendations=[];render();await run(async()=>{recommendations=await service.recommend({business_id:1,selected_item_id:lastSelected,cart_item_ids:Object.keys(cart).filter(id=>cart[id]>0).map(Number)});});}
+async function selectItem(id){lastSelected=menu.find(m=>String(m.id)===String(id))?.id;recommendations=[];render();await run(async()=>{recommendations=await service.recommend({business_id:1,selected_item_id:lastSelected,cart_item_ids:Object.keys(cart).filter(id=>cart[id]>0).map(id=>menu.find(m=>String(m.id)===String(id))?.id).filter(id=>id!==undefined)});});}
 function bind(){
  document.querySelectorAll('[data-select]').forEach(b=>b.onclick=()=>selectItem(b.dataset.select));
  if($('#pickup'))$('#pickup').onchange=e=>pickupDate=e.target.value;
