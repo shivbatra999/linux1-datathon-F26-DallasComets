@@ -1,0 +1,11 @@
+.git
+.venv
+__pycache__
+*.db
+*.sqlite*
+*.pem
+*.key
+*.gguf
+.env*
+secrets/
+models/
