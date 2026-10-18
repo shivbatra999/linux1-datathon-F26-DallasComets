@@ -14,17 +14,31 @@ async function request(path,options={}){
  }catch(e){if(e.name==='AbortError')throw new Error('Request timed out. Please retry.');throw e}finally{clearTimeout(timer)}
 }
 const json=(method,body)=>({method,body:JSON.stringify(body)});
+let activeBusinessId=null;
 const api={
- login:body=>request('/auth/login',json('POST',body)),
+ login:body=>request('/auth/login',json('POST',{
+  email:body.username.trim(),
+  password:body.password
+ })),
  logout:()=>request('/auth/logout',{method:'POST'}),
  me:()=>request('/auth/me'),
  bootstrap:async role=>{
-  if(role==='customer'){const [menu,orders]=await Promise.all([request('/businesses/1/menu'),request('/orders/mine')]);return {menu,orders,businesses:[]}}
+  if(role==='customer'){
+   const businesses=await request('/businesses');
+   const business=businesses[0];
+   if(!business)throw new Error('No active catering business is available.');
+   activeBusinessId=business.id;
+   const [menu,orders]=await Promise.all([
+    request('/businesses/'+encodeURIComponent(business.id)+'/menu'),
+    request('/orders/mine')
+   ]);
+   return {menu,orders,business};
+  }
   if(role==='owner'){const [menu,orders]=await Promise.all([request('/owner/menu'),request('/owner/orders')]);return {menu,orders,businesses:[]}}
   throw new Error('Unsupported account role.');
  },
- recommend:body=>request('/ai/recommendations',json('POST',body)),
- placeOrder:body=>request('/orders',json('POST',body)),
+ recommend:body=>request('/ai/recommendations',json('POST',{...body,business_id:activeBusinessId})),
+ placeOrder:body=>request('/orders',json('POST',{...body,business_id:activeBusinessId})),
  summary:()=>request('/ai/summary',{method:'POST'}),
  profile:()=>request('/profile'),
  saveProfile:body=>request('/profile',json('PUT',body))
