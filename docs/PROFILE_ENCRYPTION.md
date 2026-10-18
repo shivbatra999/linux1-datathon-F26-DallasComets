@@ -117,3 +117,34 @@ mount the existing key directory read-only for the container's runtime user.
 Installing requirements.txt alone does not complete Docker deployment.
 
 This is a hackathon prototype using Open Quantum Safe libraries.
+
+## Docker support completed
+
+This section supersedes "Deployment work remaining" above.
+
+The root Dockerfile installs liboqs 0.16.0 and checks ML-KEM-768 support.
+The Granite Dockerfile is unchanged.
+
+compose.encryption.yaml:
+- Loads Supabase settings from .env.
+- Runs the app at http://127.0.0.1:8002.
+- Mounts existing encryption keys read-only.
+- Runs as UID 1000, matching the tested LinuxONE key owner.
+- Requires checking key ownership when deploying on another host.
+
+Start from the repository root:
+
+```bash
+docker compose -p simplecater-encryption -f compose.encryption.yaml up -d --build
+```
+
+Verified inside Docker:
+- Health check, login, and logout.
+- ML-KEM availability and existing key access.
+- Decryption of previously saved profiles.
+- Profile updates.
+- Decryption after a container restart.
+
+This configuration supports local access or SSH tunneling.
+Public deployment requires HTTPS and a matching SIMPLECATER_ORIGIN.
+Preserve the existing keys; never replace them during deployment.

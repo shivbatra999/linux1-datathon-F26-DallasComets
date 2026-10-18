@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    env_file:
+      - .env
+    environment:
+      SIMPLECATER_ORIGIN: http://127.0.0.1:8002
+    ports:
+      - "127.0.0.1:8002:8000"
+    volumes:
+      - type: bind
+        source: ${HOME}/.config/simplecater/keys
+        target: /home/app/.config/simplecater/keys
+        read_only: true
+        bind:
+          create_host_path: false
