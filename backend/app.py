@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from .auth import current_user
+from .profile import router as profile_router
 from .config import SIMPLECATER_ORIGIN
 from starlette.concurrency import run_in_threadpool
 from .login import router as login_router
@@ -14,6 +15,7 @@ from .checkout import router as checkout_router
 
 ROOT = Path(__file__).resolve().parent.parent / 'frontend'
 app = FastAPI(title='SimpleCater', docs_url=None, redoc_url=None)
+app.include_router(profile_router)
 app.include_router(login_router)
 app.include_router(logout_router)
 app.include_router(catalog_router)
