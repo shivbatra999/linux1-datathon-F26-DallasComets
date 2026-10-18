@@ -17,5 +17,6 @@ jobs:
           script: |
             set -e
             cd ~/linux1-datathon-F26-DallasComets
+            git switch main
             git pull --ff-only
             docker compose up -d --build
