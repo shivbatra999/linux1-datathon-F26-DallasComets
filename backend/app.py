@@ -73,5 +73,5 @@ def owner_page():
 @app.get('/{asset}')
 def asset(asset: str):
     if asset not in {'app.js', 'services.js', 'fixtures.js', 'styles.css'}:
-        raise HTTPException(404, 'Not found.')
+        raise HTTPException(404, 'Not-found.')
     return FileResponse(ROOT / asset)
