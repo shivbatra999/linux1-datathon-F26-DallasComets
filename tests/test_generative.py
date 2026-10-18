@@ -192,6 +192,27 @@ class GenerativeSummaryTests(unittest.TestCase):
         self.assertEqual(result[0]["reason"], "Tea is a popular choice based on the completed order history.")
         recommend.assert_called_once()
 
+    @patch("backend.generative.load_model")
+    @patch("backend.generative.recommend", return_value=[
+        {"item_id": 2, "reason": "Popular choice: ordered in 1 of 1 past orders.", "source": "fallback"}
+    ])
+    def test_prediction_name_mapping_uses_database_rows(self, recommend, load_model):
+        load_model.return_value = {
+            "item_ids": [1, 2],
+            "model": Mock(),
+        }
+
+        result = _prediction(
+            [
+                {"id": "item-a", "name": "Box", "is_available": True},
+                {"id": "item-b", "name": "Tea", "is_available": True},
+            ],
+            [["item-a"]],
+        )
+
+        self.assertEqual(result[0]["item_id"], 2)
+        self.assertNotIn("string indices must be integers", str(result))
+
     @patch("backend.generative.generate_summary", return_value="Summary")
     @patch("backend.generative._prediction", return_value=[
         {"item_id": 2, "reason": "paired", "source": "model"}
