@@ -1,0 +1,27 @@
+# compose.yaml
+services:
+  granite:
+    platform: linux/s390x
+    build: ./docker/granite
+    ports:
+      - "8080:8080"
+    volumes:
+      - granite_models:/models
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        model=/models/granite-4.2-3b-Q4_K_M-be.gguf
+        if [ ! -f "$$model" ]; then
+          mkdir -p /models
+          curl --fail --location --retry 3 \
+            https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF/resolve/c40945d/granite-4.2-3b-Q4_K_M.gguf \
+            --output "$$model.tmp"
+          printf 'YES\n' | PYTHONPATH=/opt/gguf-py python3 \
+            /opt/gguf-py/gguf/scripts/gguf_convert_endian.py "$$model.tmp" big
+          mv "$$model.tmp" "$$model"
+        fi
+        exec llama-server --model "$$model" --alias granite \
+          --host 0.0.0.0 --port 8080 --ctx-size 4096 --parallel 1
+
+volumes:
+  granite_models:
