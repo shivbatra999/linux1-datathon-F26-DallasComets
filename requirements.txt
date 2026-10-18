@@ -6,3 +6,7 @@ cryptography
 supabase
 python-dotenv
 liboqs-python==0.16.0.1
+httpx
+scikit-learn
+numpy
+joblib
