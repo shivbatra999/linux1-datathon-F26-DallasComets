@@ -2,7 +2,7 @@ import {config} from './config.js';
 import {menu as seedMenu, orders as seedOrders} from './fixtures.js';
 export const isDemo=config.mode==='demo';
 let orders=structuredClone(seedOrders);
-let profile={name:'Jamie Davis',email:'jamie@example.com',phone:''};
+let profile={name:'Jamie Davis',phone:'',address:''};
 const copy=v=>structuredClone(v);
 async function request(path,options={}){
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),config.timeoutMs);

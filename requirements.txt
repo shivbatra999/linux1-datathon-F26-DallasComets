@@ -5,3 +5,4 @@ argon2-cffi
 cryptography
 supabase
 python-dotenv
+liboqs-python==0.16.0.1
