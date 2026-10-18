@@ -1,0 +1,8 @@
+# Core server. Pin tested versions before the final LinuxONE deployment.
+fastapi
+uvicorn
+argon2-cffi
+cryptography
+
+supabase==2.33.0
+python-dotenv==1.1.1

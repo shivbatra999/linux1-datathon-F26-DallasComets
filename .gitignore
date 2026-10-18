@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.pyc
+*.db
+*.sqlite*
+.env
+secrets/
+*.key
+*.pem
+*.gguf
+
+# Local environment files containing secrets
+.env
+.env.local
+.env.*.local
+
+# Keep the shareable template
+!.env.example
+.env
+.env.local
+.env.*.local
+!.env.example
