@@ -1,7 +1,7 @@
 FROM python:3.11-slim-trixie AS build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential cargo pkg-config libssl-dev libffi-dev cmake git \
+    build-essential cargo pkg-config libssl-dev libffi-dev cmake git gfortran libopenblas-dev liblapack-dev \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -24,7 +24,7 @@ RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 FROM python:3.11-slim-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libssl3t64 libffi8 ca-certificates \
+    libssl3t64 libffi8 ca-certificates libopenblas0-pthread liblapack3 libgfortran5 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /opt/liboqs /opt/liboqs

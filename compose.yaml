@@ -3,14 +3,20 @@ services:
   app:
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - app_data:/data
+      - type: bind
+        source: ${HOME}/.config/simplecater/keys
+        target: /home/app/.config/simplecater/keys
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       SUPABASE_URL: ${SUPABASE_URL:?Set SUPABASE_URL in .env}
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?Set SUPABASE_PUBLISHABLE_KEY in .env}
-      SIMPLECATER_ORIGIN: ${SIMPLECATER_ORIGIN:-http://127.0.0.1:8000}
-      SIMPLECATER_LLM_URL: ${SIMPLECATER_LLM_URL:-http://148.100.79.228:8080/v1}
+      SIMPLECATER_ORIGIN: ${SIMPLECATER_DEPLOY_ORIGIN:-http://127.0.0.1:8000}
+      SIMPLECATER_LLM_URL: http://granite:8080/v1
       SIMPLECATER_LLM_MODEL: ${SIMPLECATER_LLM_MODEL:-granite}
       SIMPLECATER_LLM_TIMEOUT_SECONDS: ${SIMPLECATER_LLM_TIMEOUT_SECONDS:-180}
 
@@ -18,7 +24,7 @@ services:
     platform: linux/s390x
     build: ./docker/granite
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - granite_models:/models
     entrypoint: ["sh", "-ec"]
