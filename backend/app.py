@@ -4,9 +4,15 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from .auth import current_user
+from .config import SIMPLECATER_ORIGIN
+from starlette.concurrency import run_in_threadpool
+from .login import router as login_router
+from .logout import router as logout_router
 
 ROOT = Path(__file__).resolve().parent.parent / 'frontend'
 app = FastAPI(title='SimpleCater', docs_url=None, redoc_url=None)
+app.include_router(login_router)
+app.include_router(logout_router)
 CUSTOMER = {'/api/orders/mine', '/api/orders', '/api/profile', '/api/ai/recommendations'}
 OWNER = {'/api/owner/menu', '/api/owner/orders', '/api/ai/summary'}
 
@@ -18,12 +24,12 @@ async def protect(request: Request, call_next):
         'customer' if path in CUSTOMER or path == '/customer.html' or path.startswith('/api/businesses/') else None)
     try:
         # All API routes except login require a real session. No demo account backdoor.
-        if required or (path.startswith('/api/') and path != '/api/auth/login'):
-            request.state.user = current_user(request)
+        if required or (path.startswith('/api/') and path not in ('/api/auth/login', '/api/auth/logout')):
+            request.state.user = await run_in_threadpool(current_user, request)
             if required and request.state.user['role'] != required:
                 raise HTTPException(403, 'This workspace is restricted.')
         if path.startswith('/api/') and request.method not in ('GET', 'HEAD', 'OPTIONS'):
-            expected = os.environ.get('SIMPLECATER_ORIGIN', str(request.base_url).rstrip('/'))
+            expected = SIMPLECATER_ORIGIN
             if request.headers.get('origin') != expected:
                 raise HTTPException(403, 'Untrusted request origin.')
     except HTTPException as e:

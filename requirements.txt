@@ -3,3 +3,5 @@ fastapi
 uvicorn
 argon2-cffi
 cryptography
+supabase
+python-dotenv
