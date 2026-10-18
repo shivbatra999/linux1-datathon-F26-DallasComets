@@ -126,7 +126,13 @@ def _prediction(menu_rows, history):
             "item_id": database_ids[pick["item_id"]],
             "reason": (
                 available[database_ids[pick["item_id"]]]["name"]
-                + ": " + pick["reason"]
+                + ": " + pick["reason"].replace(
+                    "past orders.",
+                    "completed orders with mapped available items."
+                ).replace(
+                    "qualifying orders.",
+                    "completed orders with mapped available items."
+                )
             ),
             "source": pick["source"],
         }
@@ -136,13 +142,17 @@ def _prediction(menu_rows, history):
 
 
 def _summary_prompt(total, order_count, prediction):
+    safe_prediction = [
+        {"reason": pick["reason"], "source": pick["source"]}
+        for pick in prediction
+    ]
     return (
         "Write two short sentences for a restaurant owner. "
         "Sentence one: summarize the sales. Sentence two: give one practical tip. "
         "Use only the facts below. Start your response with 'Final answer:'.\n"
         f"Verified completed order count: {order_count}\n"
         f"Verified completed sales total in USD: {total / 100:.2f}\n"
-        f"Predictive result: {prediction}\n"
+        f"Predictive result: {safe_prediction}\n"
     )
 
 
