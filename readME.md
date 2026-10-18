@@ -16,7 +16,7 @@ The owner dashboard's order value is not collected revenue. Payment processing i
 
 ## Team
 
-Existing repository credits: Shivansh Batra, Arman Sarder, Eshwar Singh Rajaputana, and MUHD Ayman Haque. The five workstreams in the team plan describe responsibilities, not a verified five-person roster; confirm final names and contributions before submission.
+Existing repository credits: Shivansh Batra, Arman Sarder, Eshwar Singh Rajaputana, MUHD Ayman Haque, and Aryan Tomar. The five workstreams in the team plan describe responsibilities, not a verified five-person roster; confirm final names and contributions before submission.
 
 ## Start here
 
