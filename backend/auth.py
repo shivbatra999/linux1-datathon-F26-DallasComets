@@ -1,30 +1,34 @@
-"""Session reader shared by every protected route.
-Member 3 implements login/session creation using this documented table shape.
-"""
-import hashlib
-import os
-import sqlite3
-import time
-from pathlib import Path
+"""Validate Supabase access tokens and return authorized identity."""
+import httpx
 from fastapi import HTTPException, Request
+from supabase_auth.errors import AuthApiError
+
+from .identity import identity_from_user
+from .supabase_client import new_supabase_client
 
 
 def current_user(request: Request) -> dict:
-    token = request.cookies.get('simplecater_session')
-    path = Path(os.environ.get('SIMPLECATER_DB', '/data/simplecater.db'))
-    if not token or not path.is_file():
-        raise HTTPException(401, 'Sign in first.')
+    token = request.cookies.get("simplecater_session")
+
+    if not token:
+        raise HTTPException(401, "Sign in first.")
+
+    client = new_supabase_client()
+
     try:
-        with sqlite3.connect(path) as db:
-            db.row_factory = sqlite3.Row
-            row = db.execute(
-                'SELECT u.id, u.role, u.business_id FROM sessions s '
-                'JOIN users u ON u.id=s.user_id '
-                'WHERE s.token_hash=? AND s.expires_at>?',
-                (hashlib.sha256(token.encode()).hexdigest(), time.time()),
-            ).fetchone()
-    except sqlite3.Error:
-        raise HTTPException(401, 'Session unavailable. Sign in again.') from None
-    if row is None or row['role'] not in ('customer', 'owner'):
-        raise HTTPException(401, 'Session expired. Sign in again.')
-    return dict(row)
+        result = client.auth.get_user(token)
+    except AuthApiError as error:
+        if error.status in (400, 401, 403, 404, 422):
+            raise HTTPException(
+                401, "Session invalid or expired. Sign in again."
+            ) from None
+        raise HTTPException(
+            503, "Authentication is temporarily unavailable."
+        ) from None
+    except httpx.RequestError:
+        raise HTTPException(
+            503, "Authentication is temporarily unavailable."
+        ) from None
+
+    client.postgrest.auth(token)
+    return identity_from_user(result.user, client)
