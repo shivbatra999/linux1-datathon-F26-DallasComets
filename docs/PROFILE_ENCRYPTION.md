@@ -1,150 +1,76 @@
 # Customer profile encryption
 
-## What is protected
+## Scope and flow
 
-Customer name, phone, and address are encrypted on the backend before
-being saved to Supabase profiles.encrypted_profile.
+The customer form accepts name, phone, and address. The authorized backend encrypts this JSON before writing `profiles.encrypted_profile` and decrypts it only for the signed-in customer.
 
-Flow:
-Customer form → authenticated FastAPI endpoint → encryption → Supabase.
+ML-KEM-768 establishes a fresh shared secret; HKDF-SHA256 derives a 32-byte AES key; AES-256-GCM encrypts and authenticates the JSON with a fresh salt and nonce. AAD includes the customer UUID and version. Each save produces a new encapsulation/ciphertext.
 
-Reading reverses this flow for the signed-in customer.
+The envelope contains version, key_id, algorithm, kem_ciphertext, salt, nonce, and ciphertext. Binary values use base64. The private key is not part of the envelope.
 
-Algorithms:
-- ML-KEM-768 establishes a shared secret.
-- HKDF-SHA256 derives a 256-bit encryption key.
-- AES-256-GCM encrypts the profile and detects tampering.
-- Authenticated context binds ciphertext to the customer UUID and format version.
+This helper does not encrypt login passwords, email, database identifiers, order records, or transport. Supabase Auth manages credentials. Standard HTTPS/SSH protects network connections. This is PQC-assisted profile encryption, not quantum-safe TLS or a production cryptography certification.
 
-This feature does not encrypt login passwords, order records, or network
-traffic. Supabase Auth manages passwords. HTTPS protects deployed traffic.
-Do not send decrypted profiles or encryption keys to AI models.
+## Existing deployment keys
 
-## Python dependencies
+The backend reads:
 
-Install requirements.txt inside the backend virtual environment.
+- `~/.config/simplecater/keys/profile-v1.public`
+- `~/.config/simplecater/keys/profile-v1.secret`
 
-The liboqs-python package also requires the native liboqs library.
-Our LinuxONE development setup uses liboqs 0.16.0 and
-liboqs-python 0.16.0.1.
+Directory permissions: 700; both files: 600. Existing Supabase ciphertext requires the corresponding existing secret key. Do not regenerate or replace it. Keep a secure recoverable backup outside Git/Supabase/model inputs. Version identification exists, but key rotation/multiple key versions are not implemented.
 
-## Native library setup on Ubuntu/LinuxONE
+Docker mounts the host key directory read-only at `/home/app/.config/simplecater/keys`. UID 1000 in the image matches the tested host. Read-only mounting protects files from writes by the container; a compromised authorized backend could still read them.
+
+## Native setup for direct Python execution
+
+The container builds liboqs itself. Host Python development requires a native installation:
 
 ```bash
 sudo apt install build-essential cmake libssl-dev git
-
 mkdir -p "$HOME/.local/src"
-
-git clone --depth 1 --branch 0.16.0 \
-  https://github.com/open-quantum-safe/liboqs.git \
-  "$HOME/.local/src/liboqs-0.16.0"
-
-cmake \
-  -S "$HOME/.local/src/liboqs-0.16.0" \
-  -B "$HOME/.local/src/liboqs-0.16.0/build" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=ON \
-  -DOQS_BUILD_ONLY_LIB=ON \
-  -DOQS_MINIMAL_BUILD=KEM_ml_kem_768 \
-  -DCMAKE_INSTALL_PREFIX="$HOME/.local/liboqs" \
+git clone --depth 1 --branch 0.16.0 https://github.com/open-quantum-safe/liboqs.git "$HOME/.local/src/liboqs-0.16.0"
+cmake -S "$HOME/.local/src/liboqs-0.16.0" -B "$HOME/.local/src/liboqs-0.16.0/build" \
+  -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DOQS_BUILD_ONLY_LIB=ON \
+  -DOQS_MINIMAL_BUILD=KEM_ml_kem_768 -DCMAKE_INSTALL_PREFIX="$HOME/.local/liboqs" \
   -DCMAKE_INSTALL_LIBDIR=lib
-
 cmake --build "$HOME/.local/src/liboqs-0.16.0/build" --parallel 2
 cmake --install "$HOME/.local/src/liboqs-0.16.0/build"
-```
-
-Skip cloning if that source directory already exists.
-
-Before starting the backend, set:
-
-```bash
 export OQS_INSTALL_PATH="$HOME/.local/liboqs"
 export LD_LIBRARY_PATH="$OQS_INSTALL_PATH/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+python -m pip install 'liboqs-python==0.16.0.1'
 ```
 
-## Persistent keys
+Skip cloning if the source directory already exists. Set the environment in each server terminal before using the library; the host path is not automatically available in containers.
 
-The backend expects these files under the account running the server:
+## New isolated development keys only
 
-- ~/.config/simplecater/keys/profile-v1.public
-- ~/.config/simplecater/keys/profile-v1.secret
+Run the following only for a new test environment with separate test data, using Python with liboqs installed. Never use it to replace an existing deployment's keys:
 
-Directory permissions: 700. File permissions: 600.
+```python
+from pathlib import Path
+import os
+import oqs
 
-For the existing deployment, preserve its existing keys.
-Never generate replacement keys over these files.
-Losing the secret key makes existing encrypted profiles unreadable.
-
-Keep keys outside Git, Supabase, logs, frontend code, and AI inputs.
-Back up the secret key securely with access restricted to authorized operators.
-A separate development key pair must use separate test data.
-
-## Database permissions
-
-Migration:
-supabase/migrations/20261018_002_profile_encryption.sql
-
-Prerequisites:
-- profiles table exists and has row-level security enabled.
-- Authenticated users can SELECT only their own profile.
-- Customers cannot modify role, business_id, or id.
-
-The migration permits authenticated customers to UPDATE only the
-encrypted_profile column on their own row.
-
-## API
-
-- GET /api/profile: returns the customer's decrypted profile.
-- PUT /api/profile: accepts name, phone, and address; encrypts before saving.
-- Identity comes from the validated session, not the request body.
-- Additional input fields are rejected.
-
-## Verification completed on LinuxONE
-
-- ML-KEM shared-secret round-trip.
-- Profile encryption and decryption.
-- Tampered ciphertext rejected.
-- Wrong customer UUID rejected.
-- Fresh ciphertext generated for each save.
-- API save and read.
-- Decryption after server restart.
-- Browser edit persisted after refresh.
-
-## Deployment work remaining
-
-Docker must install the native library, configure its library path, and
-mount the existing key directory read-only for the container's runtime user.
-Installing requirements.txt alone does not complete Docker deployment.
-
-This is a hackathon prototype using Open Quantum Safe libraries.
-
-## Docker support completed
-
-This section supersedes "Deployment work remaining" above.
-
-The root Dockerfile installs liboqs 0.16.0 and checks ML-KEM-768 support.
-The Granite Dockerfile is unchanged.
-
-compose.encryption.yaml:
-- Loads Supabase settings from .env.
-- Runs the app at http://127.0.0.1:8002.
-- Mounts existing encryption keys read-only.
-- Runs as UID 1000, matching the tested LinuxONE key owner.
-- Requires checking key ownership when deploying on another host.
-
-Start from the repository root:
-
-```bash
-docker compose -p simplecater-encryption -f compose.encryption.yaml up -d --build
+folder = Path.home() / ".config/simplecater/keys"
+folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+folder.chmod(0o700)
+public = folder / "profile-v1.public"
+secret = folder / "profile-v1.secret"
+if public.exists() or secret.exists():
+    raise SystemExit("Existing keys found; nothing overwritten.")
+with oqs.KeyEncapsulation("ML-KEM-768") as kem:
+    public_bytes = kem.generate_keypair()
+    secret_bytes = kem.export_secret_key()
+for path, data in ((secret, secret_bytes), (public, public_bytes)):
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
 ```
 
-Verified inside Docker:
-- Health check, login, and logout.
-- ML-KEM availability and existing key access.
-- Decryption of previously saved profiles.
-- Profile updates.
-- Decryption after a container restart.
+## Database access
 
-This configuration supports local access or SSH tunneling.
-Public deployment requires HTTPS and a matching SIMPLECATER_ORIGIN.
-Preserve the existing keys; never replace them during deployment.
+Migration 002 grants authenticated users UPDATE of only `encrypted_profile`, with a customer/own-row UPDATE policy. An own-row SELECT policy, existing RLS, and appropriate grants are prerequisites. Role, business_id, and id are not editable through the profile endpoint or that column grant. Broader pre-existing policies/grants must be audited separately.
+
+## Verification
+
+The team reported successful ML-KEM round-trip, profile round-trip, tamper/wrong-user rejection, fresh ciphertext per save, API/browser persistence, and decryption after process/container restarts. The database screenshot showed an encryption envelope, and API reads recovered the expected test values. This evidence is scoped to those checks, not a complete penetration test. See [security evidence](SECURITY_EVIDENCE.md).

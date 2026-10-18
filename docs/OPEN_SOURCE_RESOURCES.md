@@ -1,41 +1,52 @@
-# Resources and attribution register
+# Resources and attribution
 
-Keep this file in the final submission/repository. List only resources actually retained in the finished project as used; planned entries below are not claims of completed integration. Record exact tested versions and any copied/adapted files before submission.
+List actual retained resources in the final submission. URLs below are upstream sources, not a claim that all projects share a license. Preserve required notices and check the exact release/model terms before redistribution. The application repository has no project LICENSE file at this documentation checkpoint; choose a license deliberately rather than implying one.
 
-## Current frontend and server scaffold
+## Runtime software
 
-| Resource | Use / source |
-|---|---|
-| Python | Server language and standard-library sqlite3, hashlib, secrets: https://www.python.org/ and https://docs.python.org/3/library/sqlite3.html |
-| SQLite | Planned single application database; session reader uses sqlite3: https://www.sqlite.org/ |
-| FastAPI | Role-guarded API and page server: https://github.com/fastapi/fastapi |
-| Uvicorn | ASGI server: https://github.com/Kludex/uvicorn |
-| DM Sans | Frontend typography: https://fonts.google.com/specimen/DM+Sans |
-| Manrope | Frontend typography: https://fonts.google.com/specimen/Manrope |
-| httpx | Development-only backend boundary tests through FastAPI TestClient: https://github.com/encode/httpx |
+| Resource | Use | Upstream |
+|---|---|---|
+| Python | Backend language and standard library | https://www.python.org/ |
+| FastAPI | APIs, page routing, middleware | https://github.com/fastapi/fastapi |
+| Starlette | ASGI middleware/responses and test client | https://github.com/Kludex/starlette |
+| Pydantic | Input validation | https://github.com/pydantic/pydantic |
+| Uvicorn | Application server | https://github.com/Kludex/uvicorn |
+| Supabase Python SDK | Auth and PostgREST integration | https://github.com/supabase/supabase-py |
+| Supabase / PostgreSQL / PostgREST | Hosted identity/database service and underlying open-source components | https://github.com/supabase/supabase ; https://www.postgresql.org/ ; https://github.com/PostgREST/postgrest |
+| httpx | HTTP requests and tests | https://github.com/encode/httpx |
+| python-dotenv | Environment loading | https://github.com/theskumar/python-dotenv |
+| scikit-learn | BernoulliNB predictive model | https://github.com/scikit-learn/scikit-learn |
+| NumPy / SciPy | Numeric arrays and scientific model dependencies | https://github.com/numpy/numpy ; https://github.com/scipy/scipy |
+| joblib / threadpoolctl | Model persistence and numeric runtime support | https://github.com/joblib/joblib ; https://github.com/joblib/threadpoolctl |
+| cryptography | HKDF-SHA256 and AES-GCM | https://github.com/pyca/cryptography |
+| liboqs / liboqs-python | ML-KEM-768 native implementation and bindings | https://github.com/open-quantum-safe/liboqs ; https://github.com/open-quantum-safe/liboqs-python |
+| llama.cpp | llama-server inference and GGUF endian conversion | https://github.com/ggml-org/llama.cpp |
+| OpenBLAS / LAPACK | Native math libraries | https://github.com/OpenMathLib/OpenBLAS ; https://github.com/Reference-LAPACK/lapack |
+| Docker/Moby / Compose | Tested container runtime and service definition | https://github.com/moby/moby ; https://github.com/docker/compose |
+| Python and Ubuntu container images | Build/runtime bases | https://hub.docker.com/_/python ; https://hub.docker.com/_/ubuntu |
+| Git, CMake, GCC/gfortran, Rust/Cargo, pkg-config | Source builds and dependency tooling | https://git-scm.com/ ; https://cmake.org/ ; https://gcc.gnu.org/ ; https://www.rust-lang.org/ ; https://www.freedesktop.org/wiki/Software/pkg-config/ |
 
-## Selected tools still to integrate
+Supabase's hosted service is an external service, not software running on LinuxONE. Transitive packages and distribution libraries also need to be included in the final image inventory/notices where applicable.
 
-| Resource | Planned use / source |
-|---|---|
-| scikit-learn | Predictive item classifier and evaluation: https://github.com/scikit-learn/scikit-learn |
-| llama.cpp | Local inference engine: https://github.com/ggml-org/llama.cpp |
-| llama-cpp-python | Python model runtime: https://github.com/abetlen/llama-cpp-python |
-| argon2-cffi | Argon2id password hashing: https://github.com/hynek/argon2-cffi |
-| cryptography | HKDF-SHA-256 and AES-GCM: https://github.com/pyca/cryptography |
-| liboqs | Native ML-KEM implementation: https://github.com/open-quantum-safe/liboqs |
-| liboqs-python | Python KEM bindings: https://github.com/open-quantum-safe/liboqs-python |
-| Podman OR Docker/Moby | Choose the actual container runtime used: https://github.com/containers/podman or https://github.com/moby/moby |
-| Python container image | Base for Dockerfile; record tag/digest deployed: https://hub.docker.com/_/python |
+## Model and evaluation
 
-Model candidate only: IBM Granite 3.3 2B Instruct, https://huggingface.co/ibm-granite/granite-3.3-2b-instruct . Once selected, add exact GGUF source/revision, quantization, conversion tool and its license. Candidate is not downloaded or connected yet.
+- IBM Granite weights: https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF . Current Compose uses revision path `c40945d`, quantization `Q4_K_M`, then converts the file to big endian for s390x. Verify the model card/license and record exact source/hash before final redistribution.
+- Predictive artifact: `backend/model/recommender.joblib`, created by team training code using scikit-learn. Training data is synthetic, produced by `evaluation/seed_synthetic.py`; it is not an external customer dataset.
+- Faker: synthetic data generation, https://github.com/joke2k/faker . Matplotlib/Pillow: evaluation graphics, https://github.com/matplotlib/matplotlib and https://github.com/python-pillow/Pillow . SQLite: local synthetic training database only, https://www.sqlite.org/ . None is the live application datastore.
+- IBM learning material: https://github.com/linuxone-community-cloud/jupyter-lab-ml . State any specific adapted files and preserve their notices; do not represent unchanged reference notebooks as team-original solution code.
+- Evaluation JSON uses synthetic order-grouped folds; describe the dataset and baseline honestly. See [security evidence](SECURITY_EVIDENCE.md).
 
-## Referenced learning material
+## Interface assets and infrastructure
 
-IBM LinuxONE JupyterLab ML lab: https://github.com/linuxone-community-cloud/jupyter-lab-ml . This informed the project environment; do not submit unchanged lab notebooks as the original project. Record any code actually adapted and preserve required notices.
+- DM Sans and Manrope fonts: https://fonts.google.com/specimen/DM+Sans and https://fonts.google.com/specimen/Manrope . Follow the font distribution licenses.
+- Unsplash remote images: photo IDs are in frontend fixtures/styles and the catalog adapter. Image terms are separate from software licensing: https://unsplash.com/license . Photos are illustrative, not proof of actual menu appearance.
+- GitHub Actions deployment uses https://github.com/appleboy/ssh-action at `v1.2.0` to update the server checkout over SSH.
+- IBM LinuxONE Community Cloud: hosting platform, not an application dependency license. Follow the instance terms and event guidance.
 
-## Other assets (not open-source software)
+## Do not claim as deployed
 
-Menu photography uses Unsplash remote images; licensing is separate from software licenses: https://unsplash.com/license . Photo IDs are listed in frontend/fixtures.js and styles.css. Replace if final menu images do not match actual food. App data is team-created synthetic demonstration data; no external customer dataset is currently used.
+llama-cpp-python is a legacy candidate in requirements-ai.txt; deployed generation uses llama-server. Argon2-cffi remains installed but custom password hashing is not the login implementation. Podman was an alternative, while the reported deployment uses Docker. Granite 3.3 2B was an early candidate; the current model is Granite 4.2 3B. No Telum accelerator use has been demonstrated.
 
-Preserve upstream license/notice files for any redistributed code, binaries, fonts or weights. The register is not a blanket claim that all dependencies share one license. Generate exact package inventory after LinuxONE installation and add transitive/native dependencies actually distributed. Record any AI-assisted development disclosures required by the organizers.
+## Final attribution checklist
+
+Record package versions with `python -m pip freeze` inside the tested container; record native/container/llama.cpp/model revisions separately. Pin moving references after validation. Preserve required licenses for redistributed binaries, fonts, or weights. Confirm organizers' disclosure requirements for AI-assisted development and third-party resources.
