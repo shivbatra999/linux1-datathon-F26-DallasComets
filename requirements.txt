@@ -7,6 +7,6 @@ supabase
 python-dotenv
 liboqs-python==0.16.0.1
 httpx
-scikit-learn
-numpy
+scikit-learn==1.4.1.post1
+numpy==1.26.4
 joblib
