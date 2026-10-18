@@ -1,0 +1,5 @@
+# Install/verify on LinuxONE; native builds may be needed.
+scikit-learn
+llama-cpp-python
+# liboqs-python additionally requires the native liboqs library.
+liboqs-python
