@@ -12,6 +12,7 @@ from .logout import router as logout_router
 from .catalog import router as catalog_router
 from .orders import router as orders_router
 from .ai_routes import router as ai_router
+from .customer_ai import router as customer_ai_router
 from .checkout import router as checkout_router
 
 ROOT = Path(__file__).resolve().parent.parent / 'frontend'
@@ -22,6 +23,7 @@ app.include_router(logout_router)
 app.include_router(catalog_router)
 app.include_router(orders_router)
 app.include_router(ai_router)
+app.include_router(customer_ai_router)
 app.include_router(checkout_router)
 CUSTOMER = {'/api/orders/mine', '/api/orders', '/api/profile', '/api/ai/recommendations'}
 OWNER = {'/api/owner/menu', '/api/owner/orders', '/api/ai/summary'}

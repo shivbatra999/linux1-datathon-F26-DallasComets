@@ -56,58 +56,83 @@ def _final_model_text(content):
 
 
 def _prediction(menu_rows, history):
-    bundle = load_model()
-    item_ids = [int(item_id) for item_id in bundle["item_ids"]]
     if not menu_rows:
-        raise GenerationUnavailable("No menu data is available for prediction.")
+        return []
 
-    # The main-branch schema predates model_item_id. Keep the mapping local to
-    # this request and use the model's persisted feature order, never a client
-    # supplied identifier.
-    ordered = sorted(menu_rows, key=lambda row: (row["name"], row["id"]))
-    model_by_database_id = {
-        row["id"]: item_ids[index]
-        for index, row in enumerate(ordered)
-        if index < len(item_ids)
+    bundle = load_model()
+    trained_ids = {int(value) for value in bundle["item_ids"]}
+    available = {
+        row["id"]: row for row in menu_rows
+        if row["is_available"]
     }
+    mapping = {
+        row["id"]: row["model_item_id"]
+        for row in available.values()
+        if row.get("model_item_id") in trained_ids
+    }
+
+    if len(set(mapping.values())) != len(mapping):
+        raise GenerationUnavailable("Menu model mapping is ambiguous.")
+
+    # Businesses without mapped items get measured popularity only.
+    if not mapping:
+        counts = Counter(
+            item_id
+            for order in history
+            for item_id in set(order)
+            if item_id in available
+        )
+        return [
+            {
+                "item_id": item_id,
+                "reason": (
+                    f'{available[item_id]["name"]}: ordered in '
+                    f'{count} of {len(history)} completed orders.'
+                ),
+                "source": "fallback",
+            }
+            for item_id, count in counts.most_common(2)
+        ]
+
+    categories = {1: "Lunch", 2: "Lunch", 3: "Lunch",
+                  4: "Breakfast", 5: "Drinks", 6: "Desserts"}
     features = [
         {
-            "id": model_by_database_id[row["id"]],
-            "category": "Lunch",
-            "available": bool(row["is_available"]),
+            "id": model_id,
+            "category": categories.get(model_id, "Other"),
+            "available": True,
         }
-        for row in ordered
-        if row["id"] in model_by_database_id
+        for model_id in mapping.values()
     ]
     scoped_history = [
-        [model_by_database_id[item_id] for item_id in order if item_id in model_by_database_id]
+        [mapping[item_id] for item_id in set(order) if item_id in mapping]
         for order in history
     ]
     scoped_history = [order for order in scoped_history if order]
-    selected = Counter(item for order in scoped_history for item in order).most_common(1)
-    selected_id = selected[0][0] if selected else features[0]["id"]
+
+    counts = Counter(item for order in scoped_history for item in order)
+    selected_id = (
+        counts.most_common(1)[0][0] if counts
+        else min(mapping.values())
+    )
     picks = recommend(features, scoped_history, selected_id, [])
-    menu_by_database_id = {row["id"]: row for row in ordered}
-    names = {
-        model_id: menu_by_database_id[database_id]["name"]
-        for database_id, model_id in model_by_database_id.items()
+
+    database_ids = {
+        model_id: database_id
+        for database_id, model_id in mapping.items()
     }
-    friendly = []
-    for pick in picks:
-        name = names.get(pick["item_id"], "a menu item")
-        reason = pick.get("reason", "")
-        if reason.startswith("Popular choice:"):
-            reason = f"{name} is a popular choice based on the completed order history."
-        elif reason.startswith("Appeared together"):
-            reason = f"{name} is often chosen alongside another menu favorite."
-        elif reason == "Random suggestion.":
-            reason = f"Consider testing {name} as another menu option."
-        friendly.append({
-            "item_id": pick["item_id"],
-            "reason": reason,
+    return [
+        {
+            "item_id": database_ids[pick["item_id"]],
+            "reason": (
+                available[database_ids[pick["item_id"]]]["name"]
+                + ": " + pick["reason"]
+            ),
             "source": pick["source"],
-        })
-    return friendly
+        }
+        for pick in picks
+        if pick["item_id"] != selected_id
+    ]
 
 
 def _summary_prompt(total, order_count, prediction):
@@ -196,7 +221,7 @@ def owner_summary(client, business_id):
     ).data or []
     menu = (
         client.table("menu_items")
-        .select("id,name,is_available")
+        .select("id,name,is_available,model_item_id")
         .eq("business_id", str(business_id))
         .eq("is_available", True)
         .order("name")
