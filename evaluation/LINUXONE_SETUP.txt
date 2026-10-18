@@ -1,62 +1,64 @@
-SimpleCater recommender: setup and check on the LinuxONE VM (Ubuntu 24.04, s390x)
-==================================================================================
+Predictive AI on LinuxONE: current runtime
+=========================================
 
-Status: written from package research, NOT yet tested on a real LinuxONE VM.
-Whoever runs this first: note what worked and update this file.
+The assembled application was tested in Docker on LinuxONE s390x.
+See docs/DEPLOYMENT.md for build prerequisites and docs/TECH_STACK.md for
+observed versions. Older host-apt instructions are superseded by this setup.
 
-The model (backend/model/recommender.joblib) was trained on a laptop with the same
-versions the VM has: Python 3.12, scikit-learn 1.4.1, numpy 1.26.4. It should load
-as-is. Step 3 checks that; step 4 is the fallback if it does not.
+Model: backend/model/recommender.joblib
+Training estimator version: scikit-learn 1.4.1.post1
+Pinned application versions: scikit-learn 1.4.1.post1, NumPy 1.26.4
+Application container: Python 3.11, not the host development Python 3.12.
 
+Do not install the newest scikit-learn over these pins for this artifact.
+An earlier Docker test caught a 1.9.1/1.4.1.post1 mismatch before deployment.
 
-1. Install the scientific packages with apt (not pip)
------------------------------------------------------
-PyPI has no ready-made scikit-learn/numpy packages for s390x, so pip would compile
-them from source. Ubuntu's packages are prebuilt:
+Read-only runtime test, from the repository root on LinuxONE:
 
-    sudo apt install python3-sklearn
+    docker compose run --rm --no-deps -T app python - <<'PYTEST'
+    import warnings
+    import numpy as np
+    from sklearn.exceptions import InconsistentVersionWarning
+    warnings.simplefilter("error", InconsistentVersionWarning)
+    from backend.predictive import load_model
+    bundle = load_model()
+    model = bundle["model"]
+    scores = model.predict_proba(np.zeros((1, len(bundle["item_ids"])), dtype=int))
+    assert np.isfinite(scores).all()
+    assert scores.shape == (1, len(model.classes_))
+    assert np.allclose(scores.sum(axis=1), 1)
+    print("Predictive runtime: PASS")
+    PYTEST
 
-This also installs numpy, scipy, joblib and threadpoolctl, which is everything
-backend/predictive.py needs.
+This verifies compatibility and inference only, not predictive accuracy.
 
-Only if you will also generate data / train / plot on the VM (step 4):
+Synthetic training/evaluation
+-----------------------------
+The generator uses its own SQLite database and CSVs, not Supabase.
+backend/schema.sql is retained for this purpose; it is not the live schema.
+In a separate training environment with the matching scikit-learn/NumPy and
+Faker/Matplotlib/Pillow dependencies installed, the scripts are:
 
-    sudo apt install python3-matplotlib      # also installs Pillow
+    python evaluation/seed_synthetic.py --reset
+    python evaluation/train_recommender.py
 
+--reset replaces local synthetic data. Training overwrites the local model
+artifact and metrics; do not run casually in the deployment checkout.
+Review and commit any intentionally retrained artifact/evaluation together.
+Do not assume training packages are installed in the minimal app image.
 
-2. Create the virtual environment so it can see the apt packages
-----------------------------------------------------------------
-From the repo root:
+Feature mapping
+---------------
+Supabase menu UUIDs use explicit nullable menu_items.model_item_id values.
+Migration 003 maps six matching Store 1 foods to training IDs 1 through 6.
+Never derive model identity from sorting names, row order, or UUID suffixes.
+Store 2 and other unmapped foods must not inherit unrelated trained IDs.
 
-    python3 -m venv --system-site-packages .venv
-    .venv/bin/pip install -r requirements.txt
-    .venv/bin/pip install Faker               # only needed for step 4
+Customer histories are personal completed orders for one business. Owner
+histories are completed orders for the session owner business. Model-ranked
+pairings require measured co-occurrence evidence; sparse history can produce
+popularity fallback or explicitly labeled random exploration. The live
+examples verified during integration were popularity fallbacks.
 
-Do NOT run "pip install -r requirements-dev.txt" on the VM. Its pinned
-scikit-learn/numpy versions can make pip try to compile them from source.
-That file is for laptops.
-
-
-3. Check the laptop-trained model loads
----------------------------------------
-
-    .venv/bin/python -c "import sklearn; print(sklearn.__version__)"
-    .venv/bin/python -c "from backend import predictive; print(predictive.load_model()['model'])"
-
-Expected: 1.4.1 (Ubuntu may show 1.4.1.post1), then: BernoulliNB()
-Record both outputs as evidence that the predictive model runs on LinuxONE.
-
-
-4. If step 3 fails: retrain on the VM (takes a few seconds)
------------------------------------------------------------
-
-    .venv/bin/python evaluation/seed_synthetic.py --reset
-    .venv/bin/python evaluation/train_recommender.py
-
-This rebuilds data/synthetic.db and data/csv/ (synthetic data only), reruns the
-10-fold cross-validation, and saves a fresh backend/model/recommender.joblib.
-Then repeat step 3.
-
-Note: evaluation/train_recommender.py is written for scikit-learn 1.4.1, so it runs
-with Ubuntu's package. Its results (hit@2 vs popularity) may differ slightly from
-the laptop run; report the numbers the VM actually prints.
+Committed evaluation/results/metrics.json uses synthetic order-grouped folds.
+Report it as synthetic evaluation; it is not proof of real-world sales lift.

@@ -1,39 +1,44 @@
-# SimpleCater: minimum stack, two roles
+# Implemented tech stack
 
-One LinuxONE VM, one backend process, one SQLite database, and local predictive/generative inference. Customer and business owner only. No admin, widget marketplace, payment system, vector database, or external model API.
-
-| Feature | Tool | State |
+| Responsibility | Tool | Actual use |
 |---|---|---|
-| Sign-in/customer/owner pages | HTML, CSS, JavaScript modules + fetch | Implemented; demo and API adapters |
-| API, role boundaries, static assets | FastAPI + Uvicorn | Role-guarded shell implemented; business routes remain 501 |
-| Single database | Python sqlite3 | Session reader implemented; full schema/seeding assigned to member 2 |
-| Passwords and sessions | argon2-cffi + Python secrets/hashlib | Session verification implemented; login/session issuance assigned to member 3 |
-| Customer profiles | cryptography + liboqs-python/native liboqs | Planned ML-KEM-768 -> HKDF-SHA-256 -> AES-256-GCM helper |
-| Pairing predictions | scikit-learn | Planned trained classifier; frontend accepts item ID + evidence explanation |
-| Grounded sales summaries | llama-cpp-python + one small GGUF model | Planned local model; explanation includes actual predictive result |
-| Container deployment | Dockerfile usable with Docker/Podman | Core-server image definition added; not built/verified on LinuxONE |
-| HTTPS | Existing VM ingress, otherwise supported HTTPS proxy | Configure on actual LinuxONE host |
+| Browser | HTML, CSS, JavaScript modules, Fetch | Separate customer and owner pages; no frontend build framework |
+| Backend | Python, FastAPI, Uvicorn | Static pages, authentication, authorization, application and AI endpoints |
+| Identity | Supabase Auth / Python SDK | Email/password login and access-token validation; passwords are not managed by custom Argon2 code |
+| Database | Supabase PostgreSQL / PostgREST | Five public tables, RLS, and an atomic checkout function |
+| Prediction | scikit-learn BernoulliNB, NumPy, joblib | Saved model ranking plus measured evidence/fallback logic |
+| Generation | IBM Granite 4.2 3B GGUF, llama.cpp | Owner summaries over verified business facts |
+| Profile encryption | Native liboqs + liboqs-python, cryptography | ML-KEM-768, HKDF-SHA256, AES-256-GCM |
+| Packaging | Docker Engine and Docker Compose | FastAPI and Granite services on LinuxONE s390x |
+| Native math/build | OpenBLAS, LAPACK, GCC/G++, gfortran, CMake, pkg-config, Rust/Cargo | Scientific/PQC builds and model-server runtime |
+| HTTP/config | httpx, python-dotenv | Supabase/model requests and local configuration |
 
-Model candidate: IBM Granite 3.3 2B Instruct, using a compatible GGUF conversion with exact source/license documented once selected. Do not claim downloaded weights or working inference yet. Validate model memory and both AI runtimes on s390x before final package pinning. No second AI framework added solely for scoring: confirm event acceptance of scikit-learn and llama.cpp as the requested pair.
+## Versions observed in the tested application image
 
-## Deployment
+| Component | Version |
+|---|---|
+| Python image | `python:3.11-slim-trixie` |
+| scikit-learn | `1.4.1.post1` (pinned to saved estimator) |
+| NumPy | `1.26.4` (pinned) |
+| SciPy | `1.17.1` (observed build, not pinned) |
+| joblib | `1.6.0` (observed build, not pinned) |
+| liboqs / Python bindings | `0.16.0` / `0.16.0.1` |
+| FastAPI / Uvicorn | `0.144.0` / `0.54.0` (observed build) |
+| Supabase SDK | `2.33.0` (observed build) |
+| cryptography | `50.0.2` (observed build) |
 
-Frontend-only preview: `cd frontend && python3 -m http.server 4319`. Sign in with sample `customer` or `owner`, password `demo`. Demo sessions are editable browser state and NOT a security boundary. All demo profiles/orders are synthetic and reset on page reload.
+The host development environment used Python 3.12; the application container uses Python 3.11. Model loading and `predict_proba` passed in the pinned container environment. This does not reproduce the full training environment or prove predictive accuracy. Some dependencies remain unpinned; save a final package inventory before submission.
 
-Core server: create a virtual environment, `pip install -r requirements.txt`, then `uvicorn backend.app:app --host 127.0.0.1 --port 8000`. It serves API mode automatically through `/config.js`; `/owner.html` and `/customer.html` are checked server-side. Until login and data routes are implemented, sign-in returns 501. Never bypass this to expose owner data.
+## Model configuration
 
-Container shell: `docker build -t simplecater .` (or Podman). Mount persistent `/data` and a separate read-only secrets directory. Install tested native AI/PQC dependencies and add their files before recording actual inference. The supplied Dockerfile intentionally builds only the guarded integration shell. It is not a complete AI deployment. `requirements-ai.txt` lists the remaining runtime packages. Pin versions after successful LinuxONE installation; do not claim untested compatibility.
+- Predictor: `backend/model/recommender.joblib`, trained with `evaluation/train_recommender.py` on synthetic orders.
+- Generator: `ibm-granite/granite-4.2-3b-GGUF`, `granite-4.2-3b-Q4_K_M.gguf`, source path revision `c40945d` in Compose.
+- On s390x, Compose converts weights to big endian with llama.cpp's `gguf_convert_endian.py` and caches the result in a named volume.
+- Granite alias: `granite`; private API: `http://granite:8080/v1`.
+- llama.cpp currently clones its default branch, not a fixed commit. Record/pin the actual build revision for reproducibility.
 
-## Security contract
+## Legacy material
 
-- Session cookie: `simplecater_session`; HttpOnly, Secure in HTTPS, SameSite=Strict. Store SHA-256 of random opaque session token; expire/revoke sessions. Login must rate-limit attempts.
-- users requires `id`, `role` (`customer`/`owner`), `business_id`; sessions requires `token_hash`, `user_id`, `expires_at` (Unix seconds). Backend reader checks these tables. Finish remaining fields per API contract.
-- Set SIMPLECATER_DB to persistent SQLite path and SIMPLECATER_ORIGIN to trusted HTTPS origin. Unsafe API calls require matching Origin. Keep backend behind trusted ingress; do not accept arbitrary forwarded host headers.
-- Passwords are Argon2id hashes. Customer profile JSON contains name/email/phone; encrypt using per-save encapsulation and fresh AES-GCM nonce, user ID as AAD. Save ciphertext/tag, KEM ciphertext, nonce, key version in users. Private key stays outside SQLite/Git and survives restart.
-- Role guard is only the first check: data queries MUST scope orders to customer ID or owner business ID. Owner requests do not accept a client-selected business.
-- AI receives item IDs/counts/totals only, never profiles or credentials. Models do not open SQLite, execute commands, or publish changes. Backend computes supporting counts; LLM explains supplied facts.
-- PQC protects stored profiles only, not HTTPS or a compromised backend. OQS use is a prototype.
+`backend/schema.sql` is the SQLite schema used by the synthetic-data generator; it is not the live application schema. `requirements-dev.txt` describes evaluation dependencies. `requirements-ai.txt` contains earlier candidates, including llama-cpp-python; the deployed generator uses standalone llama-server, not that Python binding. `argon2-cffi` remains in requirements but is not the application's password implementation. Do not list these unused candidates as completed integrations.
 
-## Evidence for submission
-
-Record real LinuxONE instance/container plus both model executions, held-out prediction vs popularity baseline, factual-summary checks, profile encryption round trip, tamper rejection, and denied cross-role/business/customer requests. Report measured values only. Research the small-caterer beneficiary population; no invented impact or Telum claims.
+`tests/test_role_boundaries.py` still assumes old SQLite sessions and must be updated before it is used as a current regression suite. See [security evidence](SECURITY_EVIDENCE.md).
