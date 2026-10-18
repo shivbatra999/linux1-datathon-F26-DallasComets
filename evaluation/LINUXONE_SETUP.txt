@@ -1,0 +1,62 @@
+SimpleCater recommender: setup and check on the LinuxONE VM (Ubuntu 24.04, s390x)
+==================================================================================
+
+Status: written from package research, NOT yet tested on a real LinuxONE VM.
+Whoever runs this first: note what worked and update this file.
+
+The model (backend/model/recommender.joblib) was trained on a laptop with the same
+versions the VM has: Python 3.12, scikit-learn 1.4.1, numpy 1.26.4. It should load
+as-is. Step 3 checks that; step 4 is the fallback if it does not.
+
+
+1. Install the scientific packages with apt (not pip)
+-----------------------------------------------------
+PyPI has no ready-made scikit-learn/numpy packages for s390x, so pip would compile
+them from source. Ubuntu's packages are prebuilt:
+
+    sudo apt install python3-sklearn
+
+This also installs numpy, scipy, joblib and threadpoolctl, which is everything
+backend/predictive.py needs.
+
+Only if you will also generate data / train / plot on the VM (step 4):
+
+    sudo apt install python3-matplotlib      # also installs Pillow
+
+
+2. Create the virtual environment so it can see the apt packages
+----------------------------------------------------------------
+From the repo root:
+
+    python3 -m venv --system-site-packages .venv
+    .venv/bin/pip install -r requirements.txt
+    .venv/bin/pip install Faker               # only needed for step 4
+
+Do NOT run "pip install -r requirements-dev.txt" on the VM. Its pinned
+scikit-learn/numpy versions can make pip try to compile them from source.
+That file is for laptops.
+
+
+3. Check the laptop-trained model loads
+---------------------------------------
+
+    .venv/bin/python -c "import sklearn; print(sklearn.__version__)"
+    .venv/bin/python -c "from backend import predictive; print(predictive.load_model()['model'])"
+
+Expected: 1.4.1 (Ubuntu may show 1.4.1.post1), then: BernoulliNB()
+Record both outputs as evidence that the predictive model runs on LinuxONE.
+
+
+4. If step 3 fails: retrain on the VM (takes a few seconds)
+-----------------------------------------------------------
+
+    .venv/bin/python evaluation/seed_synthetic.py --reset
+    .venv/bin/python evaluation/train_recommender.py
+
+This rebuilds data/synthetic.db and data/csv/ (synthetic data only), reruns the
+10-fold cross-validation, and saves a fresh backend/model/recommender.joblib.
+Then repeat step 3.
+
+Note: evaluation/train_recommender.py is written for scikit-learn 1.4.1, so it runs
+with Ubuntu's package. Its results (hit@2 vs popularity) may differ slightly from
+the laptop run; report the numbers the VM actually prints.
