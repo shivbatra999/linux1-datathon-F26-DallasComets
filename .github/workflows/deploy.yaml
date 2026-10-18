@@ -1,0 +1,19 @@
+name: Deploy
+
+on: push
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.KEY }}
+          command_timeout: 30m
+          script: |
+            set -e
+            cd ~/linux1-datathon-F26-DallasComets
+            git pull --ff-only
+            docker compose up -d --build
